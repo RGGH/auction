@@ -1,16 +1,17 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype,contracterror, Env, Symbol, Address};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol};
 
 #[contract]
 pub struct AuctionContract;
 
 #[contracterror]
+#[derive(Debug, PartialEq)]
 pub enum AuctionError {
-    AuctionEnded=1,
-    BidTooLow=2,
-    NotAuctionOwner=3,
-    AuctionNotEnded=4,
+    AuctionEnded = 1,
+    BidTooLow = 2,
+    NotAuctionOwner = 3,
+    AuctionNotEnded = 4,
 }
 
 #[contracttype]
@@ -20,11 +21,18 @@ pub struct Auction {
     highest_bid: u64,
     highest_bidder: Option<Address>,
     end_time: u64,
+    is_active: bool, // New field
 }
 
 #[contractimpl]
 impl AuctionContract {
-    pub fn initialize(env: Env, item: Symbol, owner: Address, starting_bid: u64, duration: u64) -> Result<(), AuctionError> {
+    pub fn initialize(
+        env: Env,
+        item: Symbol,
+        owner: Address,
+        starting_bid: u64,
+        duration: u64,
+    ) -> Result<(), AuctionError> {
         let current_time = env.ledger().timestamp();
         let auction = Auction {
             item,
@@ -32,6 +40,7 @@ impl AuctionContract {
             highest_bid: starting_bid,
             highest_bidder: None,
             end_time: current_time + duration,
+            is_active: true,
         };
         env.storage().instance().set(b"auction", &auction);
         Ok(())
@@ -56,7 +65,7 @@ impl AuctionContract {
     }
 
     pub fn end_auction(env: Env, caller: Address) -> Result<(Address, u64), AuctionError> {
-        let auction: Auction = env.storage().instance().get(b"auction").unwrap();
+        let mut auction: Auction = env.storage().instance().get(b"auction").unwrap();
         let current_time = env.ledger().timestamp();
 
         if caller != auction.owner {
@@ -67,11 +76,12 @@ impl AuctionContract {
             return Err(AuctionError::AuctionNotEnded);
         }
 
-        let winner = auction.highest_bidder.unwrap_or_else(|| panic!("No winner found"));
+        let winner = auction.highest_bidder.clone().unwrap();
         let winning_bid = auction.highest_bid;
 
-        // Auction is ended, ownership is transferred or payment is handled outside the contract.
-        env.storage().instance().remove(b"auction");
+        // Auction is ended
+        auction.is_active = false;
+        env.storage().instance().set(b"auction", &auction);
 
         Ok((winner, winning_bid))
     }
@@ -81,3 +91,4 @@ impl AuctionContract {
     }
 }
 
+mod test;

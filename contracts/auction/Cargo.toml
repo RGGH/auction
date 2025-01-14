@@ -9,6 +9,9 @@ crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
+rand = "0.8.5"
+getrandom = { version = "0.2", features = ["js"] }
+
 soroban-sdk = { workspace = true }
 
 [dev-dependencies]
